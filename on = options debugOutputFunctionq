@@ -1,0 +1,172 @@
+[1mdiff --git a/lib/logzio-nodejs.js b/lib/logzio-nodejs.js[m
+[1mindex 6991674..225c920 100755[m
+[1m--- a/lib/logzio-nodejs.js[m
+[1m+++ b/lib/logzio-nodejs.js[m
+[36m@@ -17,6 +17,8 @@[m [mvar LogzioLogger = function (options) {[m
+     this.sendIntervalMs = options.sendIntervalMs || 10 * 1000;[m
+     this.bufferSize = options.bufferSize || 100;[m
+     this.debug = options.debug || false;[m
+[32m+[m[32m    this.debugJson = options.debugJson || false;[m
+[32m+[m[32m    this.debugOutputFunction = options.debugOutputFunction || false;[m
+     this.numberOfRetries = options.numberOfRetries || 3;[m
+     this.timer = null;[m
+     this.closed = false;[m
+[36m@@ -81,7 +83,10 @@[m [mLogzioLogger.prototype._defaultCallback = function(err) {[m
+ [m
+ LogzioLogger.prototype.sendAndClose = function(callback){[m
+     this.callback = callback || this._defaultCallback;[m
+[31m-    this._debug("Sending last messages and closing...");[m
+[32m+[m[32m    this._debug({[m
+[32m+[m[32m        func: "sendAndClose",[m
+[32m+[m[32m        msg: "Sending last messages and closing..."[m
+[32m+[m[32m    });[m
+     this._popMsgsAndSend();[m
+     clearTimeout(this.timer);[m
+ [m
+[36m@@ -92,8 +97,18 @@[m [mLogzioLogger.prototype.sendAndClose = function(callback){[m
+ [m
+ LogzioLogger.prototype._timerSend = function() {[m
+     if (this.messages.length > 0) {[m
+[31m-        this._debug('Woke up and saw ' + this.messages.length + ' messages to send. Sending now...');[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "_timerSend",[m
+[32m+[m[32m            messagesLeft: this.messages,[m
+[32m+[m[32m            msg: 'Woke up and saw ' + this.messages.length + ' messages to send. Sending now...'[m
+[32m+[m[32m        });[m
+         this._popMsgsAndSend();[m
+[32m+[m[32m    } else {[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "_timerSend",[m
+[32m+[m[32m            messagesLeft: this.messages,[m
+[32m+[m[32m            msg: 'No more messages to send'[m
+[32m+[m[32m        });[m
+     }[m
+ [m
+     var mythis = this;[m
+[36m@@ -107,7 +122,10 @@[m [mLogzioLogger.prototype._sendMessagesUDP = function() {[m
+ [m
+     var udpSentCallback = function(err, bytes) {[m
+         if (err) {[m
+[31m-            this._debug('Error while sending udp packets. err = ' + err);[m
+[32m+[m[32m            this._debug({[m
+[32m+[m[32m                func: "_sendMessagesUDP",[m
+[32m+[m[32m                msg: 'Error while sending udp packets. err = ' + err[m
+[32m+[m[32m            });[m
+             callback(new Error('Failed to send udp log message. err = ' + err));[m
+         }[m
+     };[m
+[36m@@ -118,7 +136,10 @@[m [mLogzioLogger.prototype._sendMessagesUDP = function() {[m
+         msg.token = this.token;[m
+         var buff = new Buffer(stringifySafe(msg));[m
+ [m
+[31m-        this._debug('Starting to send messages via udp.');[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "_sendMessagesUDP",[m
+[32m+[m[32m            msg: 'Starting to send messages via udp.'[m
+[32m+[m[32m        });[m
+         this.udpClient.send(buff, 0, buff.length, this.port, this.host, udpSentCallback);[m
+     }[m
+ };[m
+[36m@@ -132,7 +153,10 @@[m [mLogzioLogger.prototype.close = function () {[m
+ [m
+     // send pending messages, if any[m
+     if (this.messages.length > 0) {[m
+[31m-        this._debug("Closing, purging messages.");[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "close",[m
+[32m+[m[32m            msg: "Closing, purging messages."[m
+[32m+[m[32m        });[m
+         this._popMsgsAndSend();[m
+     }[m
+ [m
+[36m@@ -171,20 +195,30 @@[m [mLogzioLogger.prototype.log = function(msg) {[m
+ [m
+     this.messages.push(msg);[m
+     if (this.messages.length >= this.bufferSize) {[m
+[31m-        this._debug('Buffer is full - sending bulk');[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "log",[m
+[32m+[m[32m            msg: 'Buffer is full - sending bulk'[m
+[32m+[m[32m        });[m
+         this._popMsgsAndSend();[m
+     }[m
+ };[m
+ [m
+ LogzioLogger.prototype._popMsgsAndSend = function() {[m
+[31m-    [m
+[32m+[m
+     if (this.protocol === 'udp') {[m
+[31m-        this._debug('Sending messages via udp');[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "_popMsgsAndSend",[m
+[32m+[m[32m            msg: 'Sending messages via udp'[m
+[32m+[m[32m        });[m
+         this._sendMessagesUDP();[m
+     }[m
+     else {[m
+         var bulk = this._createBulk(this.messages);[m
+[31m-        this._debug('Sending bulk #' + bulk.id);[m
+[32m+[m[32m        this._debug({[m
+[32m+[m[32m            func: "_popMsgsAndSend",[m
+[32m+[m[32m            bulkId: bulk.id,[m
+[32m+[m[32m            msg: 'Sending bulk #' + bulk.id[m
+[32m+[m[32m        });[m
+         this._send(bulk);[m
+     }[m
+ [m
+[36m@@ -211,13 +245,27 @@[m [mLogzioLogger.prototype._messagesToBody = function(msgs) {[m
+ };[m
+ [m
+ LogzioLogger.prototype._debug = function(msg) {[m
+[31m-    if (this.debug) console.log('logzio-nodejs: ' + msg);[m
+[32m+[m[32m    if (this.debug) {[m
+[32m+[m[32m        if (this.debugJson) {[m
+[32m+[m[32m            if (this.debugOutputFunction) {[m
+[32m+[m[32m                this.debugOutputFunction(msg)[m
+[32m+[m[32m            } else {[m
+[32m+[m[32m                console.log(msg);[m
+[32m+[m[32m            }[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m            console.log('logzio-nodejs: ' + msg);[m
+[32m+[m[32m        }[m
+[32m+[m[32m    }[m
+ };[m
+ [m
+ LogzioLogger.prototype._send = function(bulk) {[m
+     var mythis = this;[m
+     function tryAgainIn(sleepTimeMs) {[m
+[31m-        mythis._debug('Bulk #' + bulk.id + ' - Trying again in ' + sleepTimeMs + '[ms], attempt no. ' + bulk.attemptNumber);[m
+[32m+[m[32m        mythis._debug({[m
+[32m+[m[32m            func: "_send",[m
+[32m+[m[32m            bulkId: bulk.id,[m
+[32m+[m[32m            msg: 'Bulk #' + bulk.id + ' - Trying again in ' + sleepTimeMs + '[ms], attempt no. ' + bulk.attemptNumber[m
+[32m+[m[32m        });[m
+         setTimeout(function() {[m
+             mythis._send(bulk);[m
+         }, sleepTimeMs);[m
+[36m@@ -248,7 +296,11 @@[m [mLogzioLogger.prototype._send = function(bulk) {[m
+                     if (bulk.attemptNumber >= mythis.numberOfRetries) {[m
+                         callback(new Error('Failed after ' + bulk.attemptNumber + ' retries on error = ' + err, err));[m
+                     } else {[m
+[31m-                        mythis._debug('Bulk #' + bulk.id + ' - failed on error: ' + err);[m
+[32m+[m[32m                        mythis._debug({[m
+[32m+[m[32m                            func: "_send",[m
+[32m+[m[32m                            bulkId: bulk.id,[m
+[32m+[m[32m                            msg: 'Bulk #' + bulk.id + ' - failed on error: ' + err[m
+[32m+[m[32m                        });[m
+                         var sleepTimeMs = bulk.sleepUntilNextRetry;[m
+                         bulk.sleepUntilNextRetry = bulk.sleepUntilNextRetry * 2;[m
+                         bulk.attemptNumber++;[m
+[36m@@ -265,7 +317,11 @@[m [mLogzioLogger.prototype._send = function(bulk) {[m
+                     callback(new Error('There was a problem with the request.\nResponse: ' + responseCode + ': ' + body.toString()));[m
+                 }[m
+                 else {[m
+[31m-                    mythis._debug('Bulk #' + bulk.id + ' - sent successfully');[m
+[32m+[m[32m                    mythis._debug({[m
+[32m+[m[32m                        func: "_send_success",[m
+[32m+[m[32m                        bulkId: bulk.id,[m
+[32m+[m[32m                        msg: 'Bulk #' + bulk.id + ' - sent successfully'[m
+[32m+[m[32m                    });[m
+                     callback();[m
+                 }[m
+             }[m
